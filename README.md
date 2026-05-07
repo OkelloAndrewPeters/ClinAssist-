@@ -1,4 +1,3 @@
-cat > /mnt/user-data/outputs/clinassist_readme/README.md << 'READMEEOF'
 # 🏥 ClinAssist Uganda
 ### Offline Clinical Decision Support for the Last Mile
 
