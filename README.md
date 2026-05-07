@@ -1,347 +1,427 @@
-# ClinAssist Uganda — AI-Powered Clinical Decision Support for the Last Mile
+cat > /mnt/user-data/outputs/clinassist_readme/README.md << 'READMEEOF'
+# 🏥 ClinAssist Uganda
+### Offline Clinical Decision Support for the Last Mile
 
-> **Gemma 4 Good Hackathon Submission**
-> Track: Health & Sciences · Global Resilience · Ollama Special Technology Track
-> Model: **Gemma 4 e2b** running locally via Ollama — no internet required
+> ⚡ Runs fully offline. Grounded in Uganda's own national guidelines. Built for health centres where specialists don't exist.
+
+**Track:** Health & Sciences &nbsp;·&nbsp; Global Resilience &nbsp;·&nbsp; Ollama Special Technology Track  
+**Model:** Gemma 4 E2B via Ollama &nbsp;·&nbsp; **Stack:** Python · Django · ChromaDB · SQLite · sentence-transformers
 
 ---
 
-## The Problem
+## The Problem Is Not Knowledge. It's Access.
 
 Uganda has **1 doctor for every 25,000 people**.
 
-At a Health Centre III in rural Karamoja or Kasese, a single clinical officer may see 80+ patients a day. They have no specialist to call. No reliable internet. No time. And one wrong decision — a missed malaria diagnosis, a wrong drug dose for a child — can cost a life.
+At a Health Centre III in rural Karamoja or Kasese, a single clinical officer sees 80+ patients a day. No specialist to call. No reliable internet. No time. One wrong decision — a missed malaria diagnosis in a 2-year-old, a paediatric dose given to an adult — can cost a life.
 
-The Uganda Ministry of Health publishes comprehensive clinical guidelines — 1,158 pages of evidence-based protocols covering every condition from malaria to meningitis, maternal emergencies to paediatric fever. But in practice, a busy clinical officer cannot flip through 1,158 pages mid-consultation.
+The Uganda Ministry of Health publishes comprehensive clinical guidelines. 1,158 pages of evidence-based protocols covering every condition from malaria to meningitis, maternal emergencies to childhood fever. The knowledge exists. It is peer-reviewed, government-endorsed, and freely available.
 
-**The knowledge exists. The access doesn't.**
+**It just never reaches the clinical officer at the moment they need it.**
+
+I built ClinAssist to close that gap. Not with a chatbot. With a grounded, offline-capable, age-aware clinical decision support system that runs on a standard laptop and cites the exact page of the guideline it used.
 
 ---
 
-## The Solution
+## Demo
 
-**ClinAssist Uganda** is a clinical decision support system that puts Uganda's own national guidelines into the hands of every health worker — in real time, at the point of care, with no internet required.
+> *Add your YouTube demo link here*
 
-A clinical officer types a patient's symptoms. ClinAssist runs a 4-step Clinical Intelligence Pipeline and returns:
+---
 
-- **Triage level** — Urgent / Moderate / Low
-- **Ranked differential diagnoses** with confidence scores and ICD-10 codes
+## What ClinAssist Does
+
+A clinical officer types a patient's symptoms in plain language. ClinAssist runs a 4-step Clinical Intelligence Pipeline and returns:
+
+- A **triage level** — Urgent / Moderate / Low — with a one-sentence clinical reason
+- **Ranked differential diagnoses** with confidence scores (0–100%) and ICD-10 codes
 - **Recommended investigations** with urgency flags (e.g. Malaria RDT — Urgent)
-- **Treatment guidance** with age-appropriate dosing for all 5 patient groups
-- **Red flags** to watch for
-- **Source citations** — exact chapter and page from the Uganda Clinical Guidelines
+- **Age-appropriate treatment guidance** — correct dosing for adults, children under 5, school-age children, elderly, and pregnant women — never mixed
+- **Red flags** to watch for before the next assessment
+- **Source citations** — exact document, chapter, and page number from the Uganda Clinical Guidelines
 
-Every answer is grounded in Uganda's own national protocols. Not generic internet data. Not hallucinated drug doses. The actual UCG 2023.
+Every output is grounded in retrieved guideline content. Not model intuition. Not internet data. The actual Uganda Clinical Guidelines 2023, Ministry of Health.
 
----
-
-## Why This Qualifies for Gemma 4 Good
-
-| Criterion | How ClinAssist Delivers |
-|---|---|
-| **Real-world impact** | Addresses Uganda's 1:25,000 doctor-patient ratio directly |
-| **Edge / offline deployment** | Runs entirely on a standard laptop — no internet after setup |
-| **Gemma 4 e2b via Ollama** | Edge-optimised model, runs on CPU, zero cloud cost |
-| **Grounded, safe AI** | Every output cites the exact guideline chapter and page |
-| **Scalable** | Same architecture works for any country's clinical guidelines |
-| **Patient continuity** | Stores full visit history — returning patients get better analysis |
+> 🔒 **100% offline after setup. Zero cloud dependency. Patient data never leaves the device.**
 
 ---
 
-## Architecture
+## Inference Pipeline
 
-```
-Patient symptoms + context
-        │
-        ▼
-┌─────────────────────────────────────────┐
-│  Django Web Application                 │
-│  - Role-based auth (doctor / admin)     │
-│  - Patient registry (auto-generated ID) │
-│  - Visit & diagnosis history            │
-│  - PDF report generation (ReportLab)    │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  Clinical Intelligence Engine           │
-│                                         │
-│  STEP 1: Contextual Retrieval (RAG)     │
-│  - Age-aware query expansion            │
-│  - ChromaDB vector search               │
-│  - Chunk scoring & filtering            │
-│                                         │
-│  STEP 2: Deliberate Reasoning Pass      │
-│  - Gemma 4 e2b thinks freely            │
-│  - Evaluates symptoms vs evidence       │
-│  - Identifies signals & uncertainties   │
-│                                         │
-│  STEP 3: Structured Synthesis Pass      │
-│  - Enforced JSON schema                 │
-│  - Triage, diagnoses, tests, treatments │
-│  - Source citations attached            │
-│                                         │
-│  STEP 4: Validation & Self-Correction   │
-│  - Schema validation layer              │
-│  - Auto-retry on failure (up to 2x)     │
-│  - Confidence normalisation             │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  Gemma 4 e2b via Ollama (local, CPU)    │
-│  Two inference calls per query:         │
-│  1. Free-text clinical reasoning        │
-│  2. Structured JSON synthesis           │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  SQLite Database                        │
-│  - Every visit stored permanently       │
-│  - Patient history injected into        │
-│    next analysis automatically          │
-│  - Full audit trail: AI vs confirmed    │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    A["Patient Symptoms<br/>+ Age Group + Setting<br/>Django Web UI"]
+    B["Age-Aware Query<br/>Expansion<br/>engine.py"]
+    C["Semantic Search<br/>all-MiniLM-L6-v2<br/>Chunk Scoring & Filtering"]
+    D["ChromaDB<br/>Uganda Clinical Guidelines<br/>1,967 Chunks · 1,158 Pages"]
+    E["Gemma 4 E2B<br/>Reasoning Pass<br/>Free-Text Deliberation"]
+    F["Gemma 4 E2B<br/>Synthesis Pass<br/>Assistant Turn Pattern"]
+    G["Validation &<br/>Self-Correction<br/>Schema Enforcement"]
+    H["Structured Output<br/>+ Real Source Citations<br/>Django UI · SQLite"]
+
+    A --> B --> C --> D --> E --> F --> G --> H
 ```
 
-### Tech Stack
+---
 
-| Layer | Technology |
-|---|---|
-| LLM | **Gemma 4 e2b** via Ollama (local, CPU-optimised) |
-| Vector DB | ChromaDB (persistent, fully local) |
-| Embeddings | sentence-transformers/all-MiniLM-L6-v2 |
-| PDF extraction | PyMuPDF |
-| Web framework | Django 6 |
-| Database | SQLite (zero-config, offline-ready) |
-| PDF reports | ReportLab |
-| Knowledge base | Uganda Clinical Guidelines 2023 (MOH) |
+## How Each Stage Works
+
+### Stage 1 — Input Layer (Django Web UI)
+
+The clinical officer enters free-text symptoms and selects three parameters: age group (Adult / Elderly / Pregnant / Child 5–17 / Under 5), symptom duration, and facility setting. Patient records are stored locally in SQLite. For returning patients, the full visit history — previous symptoms, AI suggestions, confirmed diagnoses, known conditions, allergies, current medications — is automatically surfaced and injected into the analysis context.
+
+No connectivity is required at this or any subsequent stage.
 
 ---
 
-## The 4-Step Clinical Intelligence Pipeline
+### Stage 2 — Age-Aware Query Expansion
 
-This is the core technical innovation. Most RAG systems make a single LLM call — retrieve chunks, build prompt, get response. ClinAssist uses a deliberate two-pass architecture that significantly improves output quality and reliability.
-
-### Step 1: Contextual Retrieval
-
-Standard RAG retrieves by semantic similarity alone. ClinAssist builds an **age-aware query** — the retrieval prompt is dynamically constructed based on the patient's age group (adult, elderly, pregnant, child 5–17, under 5). Retrieved chunks are then scored: chunks matching the patient's age context score higher, irrelevant chunks (e.g. paediatric doses for an adult) are demoted.
-
-The chunking pipeline also uses **carry-forward chapter detection** — each chunk inherits the chapter heading of the section it belongs to, making retrieval chapter-aware without hardcoding any document structure.
+Before retrieval, the engine constructs a semantically targeted query based on the patient's age group. This is not a simple keyword filter — it steers the entire embedding search toward the right section of the guidelines.
 
 ```python
-# Adult query steers toward adult treatment sections
-query_text = f"Uganda clinical guidelines adult outpatient treatment {symptoms}"
+# Adult patient — steers toward adult treatment sections
+query = "Uganda clinical guidelines adult outpatient treatment management {symptoms}"
 
-# Under-5 steers toward IMCI / paediatric chapters
-query_text = f"Uganda clinical guidelines child under five paediatric IMCI {symptoms}"
+# Under-5 patient — steers toward IMCI and paediatric chapters  
+query = "Uganda clinical guidelines child under five infant paediatric IMCI treatment {symptoms}"
+
+# Pregnant patient — steers toward antenatal and maternal sections
+query = "Uganda clinical guidelines pregnant woman antenatal maternal treatment safety {symptoms}"
 ```
 
-### Step 2: Deliberate Reasoning Pass
-
-Instead of going straight to JSON, Gemma 4 e2b first produces **free-text clinical reasoning** with no format constraints. It thinks through the case like a senior clinical officer — what are the likely diagnoses, what supports or argues against each, what is the urgency, what are the red flags.
-
-This reasoning scratchpad is then passed to Step 3 as additional context. The model has already worked out the answer before it tries to format it — dramatically reducing hallucinations and improving diagnostic accuracy.
-
-```
-Reasoning prompt output (example):
-"The symptom cluster of fever, chills, and joint pain in an adult 
-presenting within 1–3 days is consistent with Plasmodium falciparum 
-malaria as described in Source 2 (UCG Ch04, p.187). The absence of 
-neck stiffness argues against meningitis. Urgency is HIGH given the 
-potential for rapid deterioration..."
-```
-
-### Step 3: Structured Synthesis Pass
-
-Gemma 4 e2b makes a second inference call, this time converting the reasoning into an **enforced JSON schema**. The schema is strict — triage level, ranked diagnoses with ICD-10 codes and decimal confidence scores (0.0–1.0), investigations with urgency flags, treatments with age-appropriate dosing, red flags, and source citations.
-
-Having the reasoning available means the model synthesises from its own thinking, not from the raw chunks alone.
-
-### Step 4: Validation & Self-Correction
-
-The JSON output is validated against the required schema. If any field is missing or the JSON is malformed (e.g. truncated), the engine automatically sends the broken output back to Gemma with a correction prompt — up to 2 retries before surfacing an error. Confidence scores are normalised (0–100 integers converted to 0.0–1.0 decimals automatically).
-
-This means the system never silently returns broken data to the clinical interface.
+Each age profile also carries `keep_words` (terms to promote) and `filter_words` (terms to penalise) for chunk scoring. A paediatric dose chunk scores -1 for an adult patient. An adult dose chunk scores -1 for an under-5 patient. The wrong content is filtered before Gemma ever sees it.
 
 ---
 
-## Key Technical Innovations
+### Stage 3 — Contextual Retrieval (RAG)
 
-### Age-Aware Retrieval
-5 distinct retrieval profiles — Adult, Elderly, Pregnant, Child 5–17, Under 5. Each profile has its own query expansion, keep-words (chunks to promote), and filter-words (chunks to demote). A paediatric dose can never appear in an adult assessment because the retrieval layer filters it before the LLM ever sees it.
+`all-MiniLM-L6-v2` runs from local cache — no network call at inference time. The embedding model is downloaded once during setup and thereafter operates fully air-gapped.
 
-### Patient History Injection
-When a returning patient is seen, their full history — previous visits, AI suggestions, confirmed diagnoses, known conditions, allergies, current medications — is automatically injected into the prompt context. The LLM reasons over both the guideline evidence and the patient's clinical history simultaneously.
+The query embedding is compared against 1,967 chunk vectors stored in a local ChromaDB instance. The top 5 chunks by cosine similarity are retrieved, then re-ranked by the age-aware scoring function. A domain boost additionally promotes chunks from the clinically expected chapter — chunks from the Gastrointestinal chapter score +3 when the symptoms contain "stomach, vomiting, diarrhoea". Palliative care chunks score -3 for non-palliative queries.
 
-### Self-Describing Knowledge Base
-The PDF chunking pipeline detects chapter headings from the document's own text and carries them forward across pages. Adding any new PDF — WHO protocols, IMCI guidelines, Essential Medicines List — requires no code changes. One command: `python knowledge_base.py --file new_guideline.pdf`.
+The chunk metadata carries the exact document name, chapter (mapped from known UCG 2023 page ranges), and page number. This metadata is used directly for source citations — the LLM never generates citations.
 
-### Source Grounding
-Every recommendation cites the document name, chapter, and page number from the Uganda Clinical Guidelines. Doctors can open the physical guideline and verify any recommendation in seconds. This is the trust layer that makes clinicians actually adopt the tool.
+```
+[Source 1] Uganda Clinical Guidelines 2023 | Chapter 4: Malaria | p.231
+[Source 2] Uganda Clinical Guidelines 2023 | Chapter 4: Malaria | p.235
+[Source 3] Uganda Clinical Guidelines 2023 | Chapter 17: Childhood Illness | p.872
+```
 
-### Fully Offline Operation
-After a one-time setup, the entire system runs with zero internet connectivity. ChromaDB stores vectors locally. Ollama runs Gemma 4 e2b locally. Django serves locally over the facility's WiFi. Designed for the 3,000+ Health Centre IIs and IIIs across Uganda with no reliable connectivity.
+---
+
+### Stage 4 — Reasoning Pass (Gemma 4 E2B — Free-Text Deliberation)
+
+The retrieved guideline chunks and patient context are injected into a `REASONING_PROMPT`. Gemma 4 E2B is asked to think through the case in plain text — no format constraints, no schema.
+
+```
+Reason through this clinical case carefully:
+1. What are the most likely diagnoses and why, based on the guideline evidence?
+2. What features support or argue against each diagnosis?
+3. What is the urgency level and why?
+4. What investigations are needed to confirm the diagnosis?
+5. What is the appropriate treatment for {age_group} per the Uganda Clinical Guidelines?
+```
+
+Gemma deliberates. It weighs the symptoms against the retrieved evidence, considers differentials, identifies which source supports which conclusion, and determines urgency. This reasoning is not shown to the clinical officer — it is the model's scratchpad. It is preserved as the **assistant turn** for Stage 5.
+
+This stage is why the two-pass architecture was necessary. Single-pass inference produced a critical failure mode in early testing: the model would sometimes give paediatric doses to adult patients, or cite irrelevant guideline sections, because it was simultaneously trying to reason and format. Separating deliberation from synthesis eliminated this.
+
+---
+
+### Stage 5 — Structured Synthesis Pass (Gemma 4 E2B — Assistant Turn Pattern)
+
+This is the architectural innovation borrowed from multi-turn conversation design.
+
+The synthesis call does not start a new conversation. It **continues the existing one** — with the reasoning from Stage 4 injected as Gemma's own prior assistant message:
+
+```python
+response = ollama.chat(
+    model="gemma4:e2b",
+    messages=[
+        {"role": "system",    "content": SYSTEM_PROMPT},
+        {"role": "user",      "content": reasoning_prompt},   # Stage 4 input
+        {"role": "assistant", "content": reasoning},          # Stage 4 output — injected here
+        {"role": "user",      "content": synthesis_prompt},   # "now structure this as JSON"
+    ]
+)
+```
+
+Because Gemma is building on its own prior deliberation — completing its own thought — the structured output is forced to be consistent with the reasoning. The model cannot contradict itself. It cannot switch diagnoses between the reasoning and the JSON. It cannot forget the age group it was reasoning about.
+
+The synthesis prompt enforces a strict JSON schema:
+
+```json
+{
+  "triage":     {"level": "URGENT|MODERATE|LOW", "label": "...", "reason": "..."},
+  "diagnoses":  [{"name": "...", "confidence": 0.85, "icd10": "...", "reasoning": "..."}],
+  "tests":      [{"name": "...", "priority": "URGENT|ROUTINE", "rationale": "..."}],
+  "treatments": [{"step": "First line|Second line|Supportive|Referral", "action": "...", "notes": "..."}],
+  "red_flags":  ["...", "..."],
+  "reasoning":  "2-3 sentence clinical summary",
+  "disclaimer": "For clinical decision support only."
+}
+```
+
+Sources are **not** requested in this prompt. They are always injected from Python chunk metadata after validation — eliminating hallucinated citations entirely.
+
+---
+
+### Stage 6 — Validation & Self-Correction
+
+Output is validated against a required key schema. If any field is missing, the JSON is malformed, or confidence scores are out of range (the model occasionally returns 85 instead of 0.85), the exact error is passed back to Gemma with a correction prompt:
+
+```python
+# Broken output passed as assistant context — model fixes its own mistake
+fix_response = ollama.chat(
+    model="gemma4:e2b",
+    messages=[
+        {"role": "user",      "content": f"Your response had an error: {error}. Fix the JSON."},
+        {"role": "assistant", "content": broken_output},
+        {"role": "user",      "content": "Return only valid JSON now."},
+    ]
+)
+```
+
+Confidence scores are normalised automatically: integers in range 1–100 are converted to decimals 0.0–1.0. Maximum 2 retries before surfacing a clean error to the UI — never a silent failure.
+
+After validation, the result's source list is always overwritten:
+
+```python
+# Sources from chunk metadata — never from LLM output
+result["sources"] = _extract_sources(chunks)
+```
+
+---
+
+## Why the Two-Pass Architecture
+
+Single-pass inference failed in two specific ways that are unacceptable in a clinical tool:
+
+**1. Age-group dosing errors.** The model would sometimes copy paediatric doses for adult patients because the retrieved chunks contained both. With the reasoning pass asking explicitly "what is the appropriate treatment for Adult (18+)?", this error was eliminated — the model commits to the age group in the reasoning before the synthesis locks it into the schema.
+
+**2. Source hallucination.** The model invented plausible-sounding citations — chapter names and page numbers that did not exist. Grounding sources in Python chunk metadata rather than LLM generation eliminated this completely.
+
+The assistant turn pattern — injecting reasoning as Gemma's own prior message — is what makes the synthesis reliable. The model completes its own thought. It does not start a new one.
+
+---
+
+## Why Gemma 4 E2B
+
+These were not feature checkboxes. They were hard constraints for a tool that must run at a Health Centre III in rural Uganda.
+
+| Requirement | Why It Mattered | Gemma 4 E2B |
+|---|---|---|
+| Runs on standard CPU | Field devices are basic laptops — no GPU | E2B quantization, 7.2GB, CPU-optimised |
+| Offline after setup | No reliable connectivity during clinical use | One pull via Ollama, runs forever offline |
+| Follows structured output | Clinical JSON must be machine-readable | Reliably produces schema-compliant output |
+| Open weights | Clinical tools require full auditability | Fully open, inspectable, modifiable |
+| Fine-tunable | Future: domain adaptation on Ugandan cases | Open weights enable Unsloth fine-tuning |
+| Zero per-query cost | Health centres have no budget for cloud APIs | Local inference, zero ongoing cost |
+
+---
+
+## Project Structure
+
+```
+ClinIQ_Django/core/
+│
+├── manage.py
+├── core/                      Django settings, URLs, WSGI
+│
+├── accounts/                  Authentication
+│   ├── models.py              Custom User — role (doctor/admin), facility
+│   ├── views.py               Login, register, profile
+│   └── urls.py
+│
+├── patients/                  Patient Registry
+│   ├── models.py              Patient — auto-generated ID, demographics, history
+│   ├── views.py               List, search, create, edit
+│   └── urls.py
+│
+├── diagnoses/                 Clinical Analysis
+│   ├── models.py              Visit, Diagnosis — full JSON storage
+│   ├── views.py               New visit, run analysis, save doctor notes
+│   └── urls.py
+│
+├── reports/                   PDF Report Generation
+│   ├── views.py               Date-range report, ReportLab PDF export
+│   └── urls.py
+│
+├── ai/                        Clinical Intelligence Engine
+│   ├── engine.py              4-step pipeline — retrieve, reason, synthesise, validate
+│   ├── database.py            ChromaDB operations — embed, store, query
+│   ├── knowledge_base.py      PDF ingestion — extract, chunk, detect chapter, index
+│   └── prompts.py             SYSTEM_PROMPT, DRUG_REFERENCE_PROMPT
+│
+├── templates/                 Django HTML templates (9 files)
+├── knowledge_base_docs/       Place clinical guideline PDFs here
+├── chroma_db/                 Local ChromaDB vector store (auto-created)
+└── clinassist.db              SQLite — patients, visits, diagnoses
+```
+
+---
+
+## Quickstart
+
+### Prerequisites
+- Python 3.11+
+- [Ollama](https://ollama.com) installed on your machine
+
+### 1. Clone the repo
+```bash
+git clone https://github.com/YOUR_USERNAME/clinassist-uganda.git
+cd clinassist-uganda/core
+```
+
+### 2. Create virtual environment and install
+```bash
+python -m venv venv
+venv\Scripts\Activate.ps1      # Windows
+pip install -r requirements.txt
+```
+
+### 3. Pull Gemma 4 via Ollama
+```bash
+ollama pull gemma4:e2b
+```
+> One-time download (~7.2GB). After this, the model runs fully offline — forever.
+
+### 4. Index the knowledge base
+```bash
+mkdir knowledge_base_docs
+# Place Uganda Clinical Guidelines 2023 PDF in knowledge_base_docs/
+python .\ai\knowledge_base.py
+python .\ai\knowledge_base.py --stats
+```
+> One-time indexing. Creates 1,967 chunks with chapter metadata. ~20 seconds.  
+> To add more PDFs later: drop them in `knowledge_base_docs/` and re-run. No code changes needed.
+
+### 5. Set up Django and run
+```bash
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
+```
+Open: **http://localhost:8000**
+
+---
+
+## Offline Deployment: Hub-and-Spoke Model
+
+ClinAssist uses the same hub-and-spoke deployment pattern used by global health organisations in low-connectivity environments.
+
+1. **Provision once** at a regional centre or clinic with connectivity — pull Gemma, index PDFs, run setup
+2. **Copy the entire project folder** to a USB drive
+3. **Transfer and run** at any remote health facility — `python manage.py runserver` — no internet required, ever again
+
+The entire stack — Ollama, Gemma 4 E2B, ChromaDB, SQLite, Django — is self-contained and portable. Other devices on the same facility WiFi connect via browser. No app install needed. Patient data in `clinassist.db` never leaves the device.
 
 ---
 
 ## Clinical Features
 
+### Role-Based Access
+Each clinical officer registers with a username, email, role (Doctor / Nurse / Admin), and facility name. Doctors see only their own patients. Admins see all patients across the facility. The Django admin panel gives full oversight.
+
 ### Patient Registry
-- Auto-generated patient IDs (`CA-2026-00001`)
+- Auto-generated patient IDs: `CA-2026-00001`
 - Search by name, ID, phone, or village
 - Medical background: known conditions, allergies, current medications, next of kin
-- Role-based access: doctors see only their own patients; admin sees all
+- Visit count and last visit date visible on the patient list
 
 ### Symptom Analysis
-- Free-text symptom entry in plain language
-- Age group, duration, and facility setting selectors
-- 4-step pipeline produces grounded, structured clinical assessment
-- Doctor annotation layer: confirm final diagnosis, add clinical notes
+- Free-text symptom entry — plain language, no codes needed
+- 5 age groups with distinct retrieval profiles
+- 4-step pipeline runs automatically on submission
+- Doctor annotation: confirm final diagnosis, add clinical notes post-analysis
 
 ### Visit History & Continuity
-- Every visit stored permanently with full AI output
-- Returning patient's complete history feeds automatically into next analysis
-- Full audit trail of AI suggestions vs. doctor-confirmed diagnoses
+- Every visit stored permanently with complete AI output
+- Returning patient history injected automatically into next analysis
+- Audit trail: AI suggestion vs. doctor-confirmed diagnosis for every visit
 
 ### PDF Reports
-- Doctor selects any date range
-- System generates formatted PDF: patient list, triage levels, AI diagnoses, confirmed outcomes
+- Date-range selection
+- Downloadable PDF: patient table, triage levels, AI diagnoses, confirmed outcomes
 - Summary stats: total visits, unique patients, urgent cases
 
 ---
 
-## Real-World Deployment Model
+## Knowledge Base
 
-```
-Health Centre III (no internet)
-├── 1 laptop — 8GB RAM, standard CPU
-├── Gemma 4 e2b running via Ollama (local)
-├── Django server on facility WiFi
-└── Clinical officers connect from tablets/phones
-    (browser only — no app install needed)
+**Currently indexed:**
+- Uganda Clinical Guidelines 2023 — Ministry of Health Uganda (1,158 pages → 1,967 chunks)
 
-Zero internet required after initial setup.
-Cost of AI inference: $0/month.
-Cost to deploy: cost of one laptop.
-```
+**Chapter mapping (UCG 2023 — page ranges):**
 
-This is the deployment model for the 3,000+ Health Centre IIs and IIIs across Uganda that have no specialist, no connectivity, and no budget for cloud AI services.
+| Pages | Chapter |
+|---|---|
+| 31–80 | Chapter 1: Primary Health Care |
+| 81–150 | Chapter 2: Communicable Diseases |
+| 151–220 | Chapter 3: HIV/AIDS |
+| 221–290 | Chapter 4: Malaria |
+| 291–360 | Chapter 5: Tuberculosis |
+| 361–445 | Chapter 6: Gastrointestinal and Hepatic Diseases |
+| 446–485 | Chapter 7: Renal and Urinary Diseases |
+| 486–565 | Chapter 9: Mental, Neurological and Substance Use |
+| 566–620 | Chapter 11: Blood Diseases |
+| 621–700 | Chapter 13: Palliative Care |
+| 831–950 | Chapter 17: Childhood Illness |
+| 951–1035 | Chapter 23: Non-Communicable Diseases |
+| 1036–1100 | Chapter 24: Surgery and Anaesthesia |
 
----
+**Adding more PDFs:** Drop any PDF into `knowledge_base_docs/` and run `python .\ai\knowledge_base.py`. For non-UCG PDFs, chapter detection falls back to topic keyword scanning — no code changes needed.
 
-## Impact Potential
-
-**Immediate:**
-- Any health facility in Uganda can deploy this today on a standard laptop
-- Knowledge base built on freely available MOH publications
-- Zero per-query cost — no API fees, no subscriptions, no cloud dependency
-
-**Scale:**
-- Same architecture replicates for any country's national clinical guidelines
-- Kenya, Tanzania, Rwanda, Ethiopia — each has equivalent MOH protocols
-- Codebase is open source and documented for replication by other developers
-
-**Validation path:**
-- Pilot with 3–5 Health Centre IIIs in Uganda
-- Collect clinical officer feedback on diagnosis accuracy and usability
-- Partner with Makerere University School of Medicine for formal validation
-- Submit for MOH Uganda digital health registry
+All source PDFs freely available at: https://www.health.go.ug/publications
 
 ---
 
-## Limitations & Honest Caveats
+## Honest Notes on Limitations
 
-- **Not a replacement for clinical judgment.** Every screen includes the disclaimer. The tool supports decisions — it does not make them.
-- **Response time.** The 2-pass pipeline on a standard CPU takes 2–4 minutes per query. Acceptable for a consultation context; Gemma 4 on GPU brings this under 30 seconds.
-- **English only (current).** Uganda's clinical guidelines are in English. Luganda and Swahili support is the next priority.
-- **Single knowledge base.** Currently indexed on UCG 2023 only. IMCI, Essential Medicines List, and WHO protocols are queued for ingestion.
-- **Retrieval edge cases.** Occasional off-target chunk retrieval for rare conditions. Improving with additional PDFs and fine-tuned embeddings.
+**Response time is 2–4 minutes on a standard CPU.**  
+This is the cost of two full Gemma 4 inference passes on a 7.2GB model without a GPU. Acceptable for a clinical consultation — the officer examines the patient while the analysis runs.
 
----
+For context: **3 minutes is faster than the real alternative** — a referral to the nearest specialist, who may be a 6-hour bus ride away and a 6-month wait.
 
-## Setup & Installation
+**ClinAssist does not replace clinical judgment.**  
+It is a decision support tool. The clinical officer's examination and professional judgment remain primary. Every screen carries the disclaimer. Confidence scores surface uncertainty. Source citations allow verification in seconds.
 
-### Requirements
-- Python 3.11+
-- [Ollama](https://ollama.ai) installed
-- 8GB RAM recommended (4GB minimum with Gemma 4 e2b)
+**Retrieval quality improves with more PDFs.**  
+With one document, some conditions retrieve from adjacent chapters. Adding disease-specific guidelines — a dedicated malaria treatment manual, IMCI guidelines — significantly improves source accuracy for those conditions.
 
-### Install
-```bash
-git clone https://github.com/YOUR_USERNAME/clinassist-uganda
-cd clinassist-uganda/core
-pip install -r requirements.txt
-```
-
-### Pull Gemma 4
-```bash
-ollama pull gemma4:e2b      # edge-optimised, runs on CPU
-```
-
-### Index Knowledge Base
-```bash
-mkdir knowledge_base_docs
-# Copy Uganda Clinical Guidelines 2023 PDF into knowledge_base_docs/
-cd ai
-python knowledge_base.py
-python knowledge_base.py --stats
-cd ..
-```
-
-### Run
-```bash
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-# Open http://localhost:8000
-```
+**Validation is in progress.**  
+The system has been tested against known clinical cases from the UCG. Formal prospective validation with clinical officers at Ugandan health facilities is the immediate next step.
 
 ---
 
-## File Structure
+## Real-World Impact
 
-```
-clinassist-uganda/
-└── core/
-    ├── manage.py
-    ├── core/                   Django settings & URLs
-    ├── accounts/               Auth — login, register, roles (doctor/admin)
-    ├── patients/               Patient registry, search, history
-    ├── diagnoses/              Visit recording & AI analysis
-    ├── reports/                PDF report generation
-    ├── ai/
-    │   ├── engine.py           4-step Clinical Intelligence Pipeline
-    │   ├── database.py         ChromaDB vector store operations
-    │   ├── knowledge_base.py   PDF ingestion & chunking pipeline
-    │   └── prompts.py          LLM system prompts
-    ├── templates/              HTML UI (9 templates)
-    ├── knowledge_base_docs/    Place PDFs here
-    └── chroma_db/              Auto-created local vector store
-```
+**Immediate.** Any health facility in Uganda can deploy ClinAssist today on a standard laptop. Zero per-query cost. Zero cloud dependency. Zero subscription.
+
+**Scale.** The same architecture replicates for any country's national clinical guidelines. Kenya, Tanzania, Rwanda, Ethiopia — each has equivalent MOH protocols. Drop in the PDF, re-index, deploy.
+
+**Validation path.** Pilot with 3–5 Health Centre IIIs in Uganda → clinical officer feedback on accuracy and usability → formal validation with Makerere University School of Medicine → submission to MOH Uganda digital health registry.
 
 ---
 
-## Why Gemma 4 e2b Specifically
+## Roadmap
 
-Gemma 4 e2b is the right model for this deployment context for three reasons:
+The next phase uses Gemma 4's multimodal architecture. A clinical officer photographs a patient's presentation — rash, wound, eye condition, nutritional status — and ClinAssist adds visual assessment to the symptom analysis pipeline. Gemma 4 E2B was chosen specifically because its architecture supports multimodal input without rewriting the inference pipeline. The RAG retrieval, SQLite history, self-correction loop, and offline deployment model all transfer directly.
 
-1. **Edge-optimised for CPU.** Designed to run on resource-constrained hardware — exactly the standard laptops that exist at Uganda's health centres. No GPU required.
-2. **Follows structured instructions.** Gemma 4 reliably produces valid JSON when given a strict schema prompt, enabling the structured synthesis pass that makes clinical outputs consistent and machine-readable.
-3. **Open weights via Ollama.** No API key. No internet. No per-query cost. The model runs identically whether the laptop is in Kampala or Kotido with no connectivity.
-4. **Can be fine-tuned.** Future versions can be fine-tuned on Uganda-specific clinical cases using Unsloth — something impossible with closed models. This is the path to dramatically improved local accuracy.
+**The core system is already built for this. The input layer is what changes.**
 
 ---
 
-## The Vision
+## License
 
-Every Health Centre III in Uganda. Every clinical officer. Every patient — whether they are in Kampala or Kotido — getting the same quality of clinical guidance, grounded in the same national protocols, supported by a 4-step reasoning pipeline that thinks before it answers.
-
-ClinAssist is not a research prototype. It is running today, on a standard laptop, in Uganda.
+MIT License
 
 ---
 
-*Built for the Gemma 4 Good Hackathon — Health & Sciences / Global Resilience / Ollama Special Technology tracks.*
-*Knowledge base: Uganda Clinical Guidelines 2023, Ministry of Health Uganda.*
-*For clinical decision support only. Always apply professional judgment.*
+*Knowledge base: Uganda Clinical Guidelines 2023, Ministry of Health Uganda. For clinical decision support only. Always apply professional examination and judgment. This tool does not replace a qualified health worker.*
+READMEEOF
+echo "done"
+Output
+
+done
+Done
