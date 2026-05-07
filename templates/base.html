@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}ClinAssist Uganda{% endblock %}</title>
+<style>
+:root {
+  --green:      #1D9E75; --green-d: #0F6E56; --green-l: #E1F5EE;
+  --red:        #E24B4A; --red-l:   #FCEBEB;
+  --amber:      #EF9F27; --amber-l: #FAEEDA;
+  --blue:       #378ADD; --blue-l:  #E6F1FB;
+  --text:       #1a1a1a; --muted:   #6b6b6b; --faint: #9b9b9b;
+  --bg:         #ffffff; --surface: #f8f7f4; --border: rgba(0,0,0,0.09);
+  --radius:     10px;    --radius-s: 6px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--surface); color: var(--text); display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: 230px; background: var(--bg); border-right: 0.5px solid var(--border);
+  display: flex; flex-direction: column; padding: 1.25rem 1rem; gap: 0.5rem;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0;
+}
+.logo { display:flex; align-items:center; gap:10px; padding-bottom:1rem; border-bottom:0.5px solid var(--border); margin-bottom:0.5rem; }
+.logo-icon { width:32px;height:32px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center; }
+.logo-name { font-size:14px;font-weight:600; } .logo-sub { font-size:10px;color:var(--muted); }
+.nav-label { font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.07em;padding:0 6px;margin-top:.75rem; }
+.nav-item { display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-s);font-size:13px;color:var(--muted);text-decoration:none;transition:background .15s,color .15s; }
+.nav-item:hover { background:var(--surface);color:var(--text); }
+.nav-item.active { background:var(--green-l);color:var(--green-d);font-weight:500; }
+.nav-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
+.sidebar-footer { margin-top:auto;padding-top:1rem;border-top:0.5px solid var(--border); }
+.user-chip { display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-s);background:var(--surface); }
+.user-avatar { width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0; }
+.user-name { font-size:12px;font-weight:500;line-height:1.2; }
+.user-role { font-size:10px;color:var(--muted); }
+
+/* Main */
+.main { flex:1;display:flex;flex-direction:column;overflow-y:auto;min-width:0; }
+.topbar { background:var(--bg);border-bottom:0.5px solid var(--border);padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem; }
+.topbar-title { font-size:15px;font-weight:500; }
+.content { padding:1.5rem;max-width:960px;width:100%; }
+
+/* Cards */
+.card { background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem; }
+.card-title { font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem; }
+
+/* Forms */
+.form-input { width:100%;padding:9px 11px;font-size:13px;font-family:inherit;border:0.5px solid var(--border);border-radius:var(--radius-s);background:var(--bg);color:var(--text);transition:border-color .15s,box-shadow .15s; }
+.form-input:focus { outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(29,158,117,.12); }
+textarea.form-input { resize:vertical;line-height:1.5; }
+.form-grid { display:grid;grid-template-columns:1fr 1fr;gap:1rem; }
+.form-grid-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem; }
+.field { display:flex;flex-direction:column;gap:4px; }
+.field label { font-size:11px;color:var(--muted);font-weight:500; }
+.field-full { grid-column:1/-1; }
+
+/* Buttons */
+.btn { display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-s);font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;text-decoration:none;transition:opacity .15s; }
+.btn:hover { opacity:.85; }
+.btn:disabled { opacity:.45;cursor:not-allowed; }
+.btn-primary { background:var(--green);color:#fff; }
+.btn-ghost { background:none;border:0.5px solid var(--border);color:var(--muted); }
+.btn-ghost:hover { background:var(--surface); }
+.btn-danger { background:var(--red-l);color:#A32D2D;border:0.5px solid #F09595; }
+.btn-row { display:flex;align-items:center;gap:.75rem;margin-top:1rem; }
+
+/* Badges */
+.badge { font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500; }
+.badge-green  { background:var(--green-l);color:var(--green-d); }
+.badge-red    { background:var(--red-l);color:#A32D2D; }
+.badge-amber  { background:var(--amber-l);color:#854F0B; }
+.badge-blue   { background:var(--blue-l);color:#185FA5; }
+.badge-gray   { background:var(--surface);color:var(--muted);border:0.5px solid var(--border); }
+
+/* Triage banners */
+.triage-URGENT   { background:var(--red-l);border:0.5px solid #F09595;border-radius:var(--radius);padding:12px 16px; }
+.triage-MODERATE { background:var(--amber-l);border:0.5px solid #FAC775;border-radius:var(--radius);padding:12px 16px; }
+.triage-LOW      { background:var(--green-l);border:0.5px solid #9FE1CB;border-radius:var(--radius);padding:12px 16px; }
+.triage-label-URGENT   { color:#A32D2D;font-weight:600; }
+.triage-label-MODERATE { color:#854F0B;font-weight:600; }
+.triage-label-LOW      { color:var(--green-d);font-weight:600; }
+
+/* Tables */
+.data-table { width:100%;border-collapse:collapse;font-size:13px; }
+.data-table th { padding:8px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;border-bottom:0.5px solid var(--border); }
+.data-table td { padding:10px 12px;border-bottom:0.5px solid var(--border);vertical-align:top; }
+.data-table tr:hover td { background:var(--surface); }
+
+/* Messages */
+.messages { list-style:none;margin-bottom:1rem; }
+.messages li { padding:10px 14px;border-radius:var(--radius-s);font-size:13px;margin-bottom:6px; }
+.messages .success { background:var(--green-l);color:var(--green-d); }
+.messages .error   { background:var(--red-l);color:#A32D2D; }
+.messages .warning { background:var(--amber-l);color:#854F0B; }
+
+/* Misc */
+.section-label { font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:500;margin-bottom:8px; }
+.empty-state { text-align:center;padding:3rem 1rem;color:var(--muted); }
+.empty-state .icon { font-size:2.5rem;margin-bottom:.75rem; }
+.conf-bar-wrap { display:flex;align-items:center;gap:8px; }
+.conf-bar { width:70px;height:5px;background:var(--border);border-radius:3px;overflow:hidden; }
+.conf-fill { height:100%;border-radius:3px; }
+.conf-high { background:var(--red); } .conf-med { background:var(--amber); } .conf-low { background:var(--green); }
+.two-col { display:grid;grid-template-columns:1fr 1fr;gap:1rem; }
+.item-list { list-style:none;display:flex;flex-direction:column;gap:7px; }
+.item-list li { font-size:13px;display:flex;gap:8px;align-items:flex-start;line-height:1.4; }
+.item-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px; }
+.dot-green { background:var(--green); } .dot-red { background:var(--red); } .dot-blue { background:var(--blue); }
+.item-meta { font-size:11px;color:var(--faint);display:block;margin-top:1px; }
+.source-box { padding:8px 12px;background:var(--blue-l);border:0.5px solid #B5D4F4;border-radius:var(--radius-s);font-size:12px;color:#185FA5; }
+hr.divider { border:none;border-top:0.5px solid var(--border);margin:1rem 0; }
+@media(max-width:680px){.sidebar{display:none}.form-grid,.form-grid-3,.two-col{grid-template-columns:1fr}}
+</style>
+{% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% if user.is_authenticated %}
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 2C6.24 2 4 4.24 4 7c0 2.1 1.2 3.93 3 4.9V14h4v-2.1c1.8-.97 3-2.8 3-4.9 0-2.76-2.24-5-5-5z" fill="white" fill-opacity="0.9"/>
+        <rect x="6" y="14" width="6" height="1.5" rx=".75" fill="white" fill-opacity=".6"/>
+      </svg>
+    </div>
+    <div><div class="logo-name">ClinAssist</div><div class="logo-sub">Uganda Clinical AI</div></div>
+  </div>
+
+  <div class="nav-label">Clinical</div>
+  <a href="{% url 'patients:list' %}" class="nav-item {% if request.resolver_match.app_name == 'patients' %}active{% endif %}">
+    <div class="nav-dot" style="background:var(--green)"></div> Patients
+  </a>
+  <a href="{% url 'reports:index' %}" class="nav-item {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">
+    <div class="nav-dot" style="background:var(--blue)"></div> Reports
+  </a>
+
+  {% if user.is_facility_admin %}
+  <div class="nav-label">Admin</div>
+  <a href="/admin/" class="nav-item">
+    <div class="nav-dot" style="background:var(--amber)"></div> Django admin
+  </a>
+  {% endif %}
+
+  <div class="sidebar-footer">
+    <div class="user-chip">
+      <div class="user-avatar">{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ user.get_full_name|truncatechars:18 }}</div>
+        <div class="user-role">{{ user.get_role_display }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <a href="{% url 'accounts:profile' %}" class="btn btn-ghost" style="flex:1;justify-content:center;font-size:11px;padding:6px">Profile</a>
+      <a href="{% url 'accounts:logout' %}" class="btn btn-ghost" style="flex:1;justify-content:center;font-size:11px;padding:6px">Logout</a>
+    </div>
+  </div>
+</aside>
+{% endif %}
+
+<div class="main">
+  {% if user.is_authenticated %}
+  <header class="topbar">
+    <div class="topbar-title">{% block topbar_title %}ClinAssist{% endblock %}</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      {% block topbar_actions %}{% endblock %}
+    </div>
+  </header>
+  {% endif %}
+
+  <div class="content">
+    {% if messages %}
+    <ul class="messages">
+      {% for msg in messages %}
+      <li class="{{ msg.tags }}">{{ msg }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

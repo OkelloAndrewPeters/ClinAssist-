@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.get_full_name }} — ClinAssist{% endblock %}
+{% block topbar_title %}{{ patient.get_full_name }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'patients:edit' patient.pk %}" class="btn btn-ghost">Edit record</a>
+  <a href="{% url 'diagnoses:new_visit' patient.pk %}" class="btn btn-primary">+ New visit</a>
+{% endblock %}
+
+{% block content %}
+<!-- Patient info card -->
+<div class="card" style="margin-bottom:1rem">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+    <div>
+      <div style="font-size:20px;font-weight:600">{{ patient.get_full_name }}</div>
+      <div style="font-size:13px;color:var(--muted)">{{ patient.patient_id }} · {{ patient.get_sex_display }} · {{ patient.get_age_display }}</div>
+    </div>
+    <span class="badge badge-gray">{{ patient.get_age_group }}</span>
+  </div>
+  <div class="form-grid-3" style="font-size:13px">
+    <div><span style="color:var(--muted)">Phone</span><br>{{ patient.phone|default:"—" }}</div>
+    <div><span style="color:var(--muted)">Village</span><br>{{ patient.village|default:"—" }}</div>
+    <div><span style="color:var(--muted)">District</span><br>{{ patient.district|default:"—" }}</div>
+    <div><span style="color:var(--muted)">Next of kin</span><br>{{ patient.next_of_kin|default:"—" }}</div>
+    <div><span style="color:var(--muted)">NOK phone</span><br>{{ patient.nok_phone|default:"—" }}</div>
+    <div><span style="color:var(--muted)">Registered</span><br>{{ patient.created_at|date:"d M Y" }}</div>
+  </div>
+  {% if patient.known_conditions or patient.allergies or patient.current_medications %}
+  <hr class="divider">
+  <div class="form-grid-3" style="font-size:13px">
+    {% if patient.known_conditions %}
+    <div><span style="color:var(--muted)">Known conditions</span><br>{{ patient.known_conditions }}</div>
+    {% endif %}
+    {% if patient.allergies %}
+    <div><span style="color:var(--red)">⚠ Allergies</span><br>{{ patient.allergies }}</div>
+    {% endif %}
+    {% if patient.current_medications %}
+    <div><span style="color:var(--muted)">Current medications</span><br>{{ patient.current_medications }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Visit history -->
+<div style="font-size:14px;font-weight:500;margin-bottom:.75rem">
+  Visit history ({{ visits.count }})
+</div>
+
+{% if visits %}
+{% for visit in visits %}
+<div class="card" style="margin-bottom:.75rem">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem">
+    <div>
+      <div style="font-size:13px;font-weight:500">{{ visit.created_at|date:"d M Y, H:i" }}</div>
+      <div style="font-size:12px;color:var(--muted)">{{ visit.get_setting_display }} · {{ visit.doctor.get_full_name }}</div>
+    </div>
+    {% for dx in visit.diagnoses.all %}
+    <span class="badge {% if dx.triage_level == 'URGENT' %}badge-red{% elif dx.triage_level == 'MODERATE' %}badge-amber{% else %}badge-green{% endif %}">
+      {{ dx.triage_level }}
+    </span>
+    {% endfor %}
+  </div>
+
+  <div style="font-size:13px;margin-bottom:.75rem"><span style="color:var(--muted)">Symptoms:</span> {{ visit.symptoms|truncatechars:150 }}</div>
+
+  {% for dx in visit.diagnoses.all %}
+  <div style="font-size:13px">
+    <span class="section-label">AI Diagnoses</span>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+      {% for d in dx.diagnoses_json %}
+      <span class="badge badge-gray">{{ d.name }} ({{ d.confidence|floatformat:0 }}%)</span>
+      {% endfor %}
+    </div>
+    {% if dx.final_diagnosis %}
+    <div style="font-size:12px"><span style="color:var(--muted)">Confirmed:</span> <strong>{{ dx.final_diagnosis }}</strong></div>
+    {% endif %}
+    {% if dx.doctor_notes %}
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">Notes: {{ dx.doctor_notes }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% else %}
+<div class="empty-state">
+  <div class="icon">🩺</div>
+  <div style="font-weight:500;margin-bottom:.5rem">No visits recorded yet</div>
+  <a href="{% url 'diagnoses:new_visit' patient.pk %}" class="btn btn-primary">Start first visit</a>
+</div>
+{% endif %}
+{% endblock %}

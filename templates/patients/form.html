@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — ClinAssist{% endblock %}
+{% block topbar_title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px">
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-grid">
+      {% for field in form %}
+      <div class="field {% if field.name in 'known_conditions,allergies,current_medications' %}field-full{% endif %}">
+        <label>{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+        {{ field }}
+        {% if field.errors %}<div style="font-size:12px;color:#A32D2D;margin-top:3px">{{ field.errors|join:", " }}</div>{% endif %}
+        {% if field.help_text %}<div style="font-size:11px;color:var(--faint);margin-top:2px">{{ field.help_text }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Save patient</button>
+      <a href="{% url 'patients:list' %}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Login — ClinAssist Uganda{% endblock %}
+{% block content %}
+<style>
+.auth-wrap { min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--surface); }
+.auth-card { background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:2rem;width:100%;max-width:400px; }
+.auth-logo { text-align:center;margin-bottom:1.5rem; }
+.auth-logo-icon { width:48px;height:48px;background:var(--green);border-radius:12px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:.75rem; }
+.auth-title { font-size:18px;font-weight:600;margin-bottom:.25rem; }
+.auth-sub { font-size:13px;color:var(--muted); }
+.form-group { margin-bottom:.75rem; }
+.form-group label { display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:4px; }
+.auth-footer { text-align:center;margin-top:1rem;font-size:13px;color:var(--muted); }
+.auth-footer a { color:var(--green);text-decoration:none;font-weight:500; }
+.error-list { font-size:12px;color:#A32D2D;margin-top:4px; }
+</style>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">
+        <svg width="26" height="26" viewBox="0 0 18 18" fill="none">
+          <path d="M9 2C6.24 2 4 4.24 4 7c0 2.1 1.2 3.93 3 4.9V14h4v-2.1c1.8-.97 3-2.8 3-4.9 0-2.76-2.24-5-5-5z" fill="white" fill-opacity="0.9"/>
+          <rect x="6" y="14" width="6" height="1.5" rx=".75" fill="white" fill-opacity=".6"/>
+        </svg>
+      </div>
+      <div class="auth-title">ClinAssist Uganda</div>
+      <div class="auth-sub">Clinical Decision Support</div>
+    </div>
+
+    {% if messages %}
+    <ul class="messages">{% for msg in messages %}<li class="{{ msg.tags }}">{{ msg }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+      <div class="form-group">
+        <label>{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<div class="error-list">{{ field.errors|join:", " }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px">
+        Sign in
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      No account? <a href="{% url 'accounts:register' %}">Create one</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Create account — ClinAssist{% endblock %}
+{% block content %}
+<style>
+.auth-wrap { min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem; }
+.auth-card { background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:2rem;width:100%;max-width:560px; }
+.auth-title { font-size:18px;font-weight:600;margin-bottom:.25rem; }
+.auth-sub   { font-size:13px;color:var(--muted);margin-bottom:1.5rem; }
+.form-group { margin-bottom:.75rem; }
+.form-group label { display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:4px; }
+.error-list { font-size:12px;color:#A32D2D;margin-top:4px; }
+.auth-footer { text-align:center;margin-top:1rem;font-size:13px;color:var(--muted); }
+.auth-footer a { color:var(--green);text-decoration:none;font-weight:500; }
+</style>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
+      <div style="width:36px;height:36px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 18 18" fill="none"><path d="M9 2C6.24 2 4 4.24 4 7c0 2.1 1.2 3.93 3 4.9V14h4v-2.1c1.8-.97 3-2.8 3-4.9 0-2.76-2.24-5-5-5z" fill="white" fill-opacity="0.9"/><rect x="6" y="14" width="6" height="1.5" rx=".75" fill="white" fill-opacity=".6"/></svg>
+      </div>
+      <div>
+        <div class="auth-title">Create your account</div>
+        <div class="auth-sub" style="margin-bottom:0">ClinAssist Uganda</div>
+      </div>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-grid">
+        {% for field in form %}
+        <div class="form-group {% if field.name == 'password1' or field.name == 'password2' or field.name == 'facility' %}field-full{% endif %}">
+          <label>{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+          {{ field }}
+          {% if field.help_text and field.name == 'password1' %}
+          <div style="font-size:11px;color:var(--faint);margin-top:3px">{{ field.help_text }}</div>
+          {% endif %}
+          {% if field.errors %}<div class="error-list">{{ field.errors|join:", " }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;margin-top:.5rem">
+        Create account
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

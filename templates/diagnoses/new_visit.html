@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}New visit — {{ patient.get_full_name }}{% endblock %}
+{% block topbar_title %}New visit · {{ patient.get_full_name }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'patients:detail' patient.pk %}" class="btn btn-ghost">← Patient record</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:1.25rem;align-items:start">
+
+  <!-- Left: input form -->
+  <div>
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title">Patient</div>
+      <div style="font-size:14px;font-weight:500">{{ patient.get_full_name }}</div>
+      <div style="font-size:12px;color:var(--muted)">{{ patient.patient_id }} · {{ patient.get_sex_display }} · {{ patient.get_age_display }}</div>
+      {% if patient.allergies %}
+      <div style="font-size:12px;color:#A32D2D;margin-top:6px">⚠ Allergies: {{ patient.allergies }}</div>
+      {% endif %}
+      {% if patient.known_conditions %}
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Known: {{ patient.known_conditions }}</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Symptoms &amp; context</div>
+
+      <div class="field" style="margin-bottom:.75rem">
+        <label>Presenting symptoms *</label>
+        <textarea id="symptomsInput" class="form-input" rows="4"
+          placeholder="Describe the patient's symptoms…&#10;e.g. fever for 3 days, severe headache, chills, joint pain"></textarea>
+      </div>
+
+      <div class="form-grid-3" style="margin-bottom:.75rem">
+        <div class="field">
+          <label>Age group</label>
+          <select id="ageGroup" class="form-input">
+            {% for a in age_choices %}
+            <option {% if a == age_group %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Duration</label>
+          <select id="duration" class="form-input">
+            {% for d in duration_choices %}<option>{{ d }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Setting</label>
+          <select id="setting" class="form-input">
+            {% for k,v in settings_choices %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:.75rem">
+        <label>Additional notes (optional)</label>
+        <textarea id="notesInput" class="form-input" rows="2"
+          placeholder="Vital signs, physical findings, other observations…"></textarea>
+      </div>
+
+      <button id="analyseBtn" class="btn btn-primary" onclick="runAnalysis()" style="width:100%;justify-content:center">
+        Analyse symptoms
+      </button>
+
+      <div id="progressWrap" style="display:none;margin-top:.75rem">
+        <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden">
+          <div id="progressFill" style="height:100%;background:var(--green);border-radius:2px;width:0%;transition:width .3s"></div>
+        </div>
+        <div id="progressLabel" style="font-size:11px;color:var(--muted);margin-top:4px;text-align:center">Analysing…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: results -->
+  <div id="resultsPanel">
+    <div class="card" style="padding:2.5rem;text-align:center;color:var(--muted)">
+      <div style="font-size:2rem;margin-bottom:.75rem">🩺</div>
+      <div style="font-weight:500;margin-bottom:.5rem">Ready to analyse</div>
+      <div style="font-size:13px">Enter symptoms and click Analyse</div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const PATIENT_PK = {{ patient.pk }};
+const ANALYSE_URL = "{% url 'diagnoses:run_analysis' patient.pk %}";
+const CSRF = "{{ csrf_token }}";
+
+let progressTimer;
+
+function startProgress() {
+  const fill = document.getElementById("progressFill");
+  document.getElementById("progressWrap").style.display = "block";
+  let pct = 0;
+  progressTimer = setInterval(() => {
+    pct = Math.min(pct + (pct < 70 ? 3 : 0.5), 92);
+    fill.style.width = pct + "%";
+  }, 800);
+}
+
+function stopProgress() {
+  clearInterval(progressTimer);
+  document.getElementById("progressFill").style.width = "100%";
+  setTimeout(() => {
+    document.getElementById("progressWrap").style.display = "none";
+    document.getElementById("progressFill").style.width = "0%";
+  }, 400);
+}
+
+async function runAnalysis() {
+  const symptoms = document.getElementById("symptomsInput").value.trim();
+  if (!symptoms) { document.getElementById("symptomsInput").focus(); return; }
+
+  const btn = document.getElementById("analyseBtn");
+  btn.disabled = true;
+  btn.textContent = "Analysing…";
+  startProgress();
+
+  try {
+    const resp = await fetch(ANALYSE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": CSRF },
+      body: new URLSearchParams({
+        symptoms:  symptoms,
+        age_group: document.getElementById("ageGroup").value,
+        duration:  document.getElementById("duration").value,
+        setting:   document.getElementById("setting").value,
+        notes:     document.getElementById("notesInput").value,
+      })
+    });
+    const data = await resp.json();
+    stopProgress();
+    renderResults(data);
+  } catch(err) {
+    stopProgress();
+    document.getElementById("resultsPanel").innerHTML =
+      `<div class="card" style="border-color:#F09595;background:var(--red-l);color:#A32D2D;font-size:13px">
+        Error: ${err.message}<br>Is the server running?
+      </div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Analyse symptoms";
+  }
+}
+
+function pct(v) { return Math.round((v||0)*100); }
+function confClass(v) { return v>=0.7?"conf-high":v>=0.4?"conf-med":"conf-low"; }
+
+function renderResults(data) {
+  if (data.error && !data.triage) {
+    document.getElementById("resultsPanel").innerHTML =
+      `<div class="card" style="border-color:#F09595;background:var(--red-l);color:#A32D2D;font-size:13px">${data.error}</div>`;
+    return;
+  }
+
+  const t  = data.triage    || {};
+  const lvl= t.level || "MODERATE";
+  const dx = data.diagnoses  || [];
+  const ts = data.tests      || [];
+  const tx = data.treatments || [];
+  const rf = data.red_flags  || [];
+  const src= data.sources    || [];
+  const m  = data._meta      || {};
+
+  let html = `
+  <div class="triage-${lvl}" style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div class="triage-label-${lvl}" style="font-size:14px">${t.label||lvl}</div>
+      <div style="font-size:12px;opacity:.8;margin-top:2px">${t.reason||""}</div>
+    </div>
+    <span class="badge ${lvl==='URGENT'?'badge-red':lvl==='MODERATE'?'badge-amber':'badge-green'}">${lvl}</span>
+  </div>`;
+
+  // Diagnoses
+  if (dx.length) {
+    html += `<div class="card" style="margin-bottom:1rem"><div class="card-title">Possible diagnoses</div>`;
+    dx.forEach((d,i) => {
+      const p = pct(d.confidence);
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
+        <span style="font-size:11px;color:var(--faint);min-width:14px">${i+1}</span>
+        <span style="font-size:13px;font-weight:500;flex:1">${d.name}</span>
+        ${d.icd10?`<span style="font-size:11px;color:var(--faint);font-family:monospace">${d.icd10}</span>`:""}
+        <div class="conf-bar-wrap">
+          <div class="conf-bar"><div class="conf-fill ${confClass(d.confidence||0)}" style="width:${p}%"></div></div>
+          <span style="font-size:11px;color:var(--muted);min-width:28px">${p}%</span>
+        </div>
+      </div>
+      ${d.reasoning?`<p style="font-size:12px;color:var(--muted);padding:4px 24px 4px;line-height:1.5">${d.reasoning}</p>`:""}`;
+    });
+    html += `</div>`;
+  }
+
+  // Tests + Treatments
+  html += `<div class="two-col" style="margin-bottom:1rem">
+  <div class="card"><div class="card-title">Tests</div><ul class="item-list">`;
+  ts.forEach(t => {
+    html += `<li><div class="item-dot dot-blue"></div><div>${t.name}
+      ${t.priority==="URGENT"?`<span style="font-size:10px;background:var(--red-l);color:#A32D2D;padding:1px 5px;border-radius:3px;margin-left:4px">Urgent</span>`:""}
+      ${t.rationale?`<span class="item-meta">${t.rationale}</span>`:""}
+    </div></li>`;
+  });
+  if (!ts.length) html += `<li style="color:var(--faint)">None specified</li>`;
+  html += `</ul></div>
+  <div class="card"><div class="card-title">Treatment</div><ul class="item-list">`;
+  tx.forEach(t => {
+    html += `<li><div class="item-dot dot-green"></div><div>
+      <span style="font-size:10px;background:var(--green-l);color:var(--green-d);padding:1px 5px;border-radius:3px;margin-right:4px">${t.step}</span>
+      ${t.action}
+      ${t.notes?`<span class="item-meta">${t.notes}</span>`:""}
+    </div></li>`;
+  });
+  if (!tx.length) html += `<li style="color:var(--faint)">Seek specialist guidance</li>`;
+  html += `</ul></div></div>`;
+
+  // Red flags
+  if (rf.length) {
+    html += `<div class="card" style="margin-bottom:1rem"><div class="card-title">Red flags</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${rf.map(f=>`<span style="font-size:11px;padding:3px 8px;background:var(--red-l);color:#A32D2D;border-radius:4px">${f}</span>`).join("")}
+      </div></div>`;
+  }
+
+  // Sources
+  if (src.length) {
+    html += `<div class="card" style="margin-bottom:1rem"><div class="card-title">Guideline sources</div>`;
+    src.forEach(s => {
+      const page = s.page ? s.page.replace(/^p\.?\s*/i,"") : null;
+      html += `<div class="source-box" style="margin-bottom:6px">
+        📄 <strong>${s.document}</strong>
+        ${s.chapter?` · ${s.chapter}`:""}${page?` · p. ${page}`:""}
+        ${s.relevance?`<br><span style="opacity:.8">${s.relevance}</span>`:""}
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Doctor notes form
+  if (data.diagnosis_id) {
+    html += `<div class="card" style="margin-bottom:1rem">
+      <div class="card-title">Doctor's annotation</div>
+      <form method="post" action="/diagnoses/dx/${data.diagnosis_id}/notes/">
+        <input type="hidden" name="csrfmiddlewaretoken" value="${CSRF}">
+        <div class="field" style="margin-bottom:.75rem">
+          <label>Confirmed final diagnosis</label>
+          <input type="text" name="final_diagnosis" class="form-input" placeholder="e.g. Malaria (confirmed by RDT)">
+        </div>
+        <div class="field" style="margin-bottom:.75rem">
+          <label>Clinical notes</label>
+          <textarea name="doctor_notes" class="form-input" rows="2" placeholder="Your observations, plan, follow-up…"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="font-size:12px;padding:7px 14px">Save notes</button>
+      </form>
+    </div>`;
+  }
+
+  // Meta
+  if (m.latency_s) {
+    html += `<div style="text-align:right;font-size:11px;color:var(--faint)">
+      ${m.chunks_retrieved} chunks · ${m.model} · ${m.latency_s}s
+    </div>`;
+  }
+
+  html += `<div style="font-size:11px;color:var(--faint);text-align:center;margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid var(--border)">
+    For clinical decision support only. Always apply professional judgment.
+  </div>`;
+
+  document.getElementById("resultsPanel").innerHTML = html;
+  document.getElementById("resultsPanel").scrollIntoView({behavior:"smooth"});
+}
+</script>
+{% endblock %}

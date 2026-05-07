@@ -1,0 +1,32 @@
+chroma_db
+clinassist.db
+engine_backup.py
+venv
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.env
+
+# VS Code
+.vscode/
+
+# ChromaDB
+chroma_db/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables
+.env
