@@ -419,8 +419,3 @@ MIT License
 
 *Knowledge base: Uganda Clinical Guidelines 2023, Ministry of Health Uganda. For clinical decision support only. Always apply professional examination and judgment. This tool does not replace a qualified health worker.*
 READMEEOF
-
-Output
-
-done
-Done
