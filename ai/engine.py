@@ -177,7 +177,7 @@ def retrieve_chunks(symptoms: str, age_group: str, duration: str) -> list:
 
     # Build demographic-specific retrieval strategy
     profile    = _build_age_profile(age_group)
-     # Construct enriched retrieval query
+    # Construct enriched retrieval query
     query_text = (
         f"Uganda clinical guidelines {profile['qualifier']} "
         f"diagnosis treatment {symptoms} duration {duration}"
