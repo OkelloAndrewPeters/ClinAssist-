@@ -24,7 +24,7 @@ I built ClinAssist to close that gap. Not with a chatbot. With a grounded, offli
 
 ## Demo
 
-> *Add your YouTube demo link here*
+[![ClinAssist Uganda — Offline Clinical Decision Support for the Last Mile](https://img.youtube.com/vi/HZ8xT862mMI/hqdefault.jpg)](https://youtu.be/HZ8xT862mMI?si=CUhMQjmssHVkiEfE)
 
 ---
 
