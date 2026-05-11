@@ -262,6 +262,7 @@ def _extract_sources(chunks: list) -> list:
 # STEP 2 — REASONING PASS
 # =============================================================================
 
+# Prompt used for unrestricted clinical reasoning
 REASONING_PROMPT = """You are a clinical decision support assistant for Uganda's health system.
 
 PATIENT:
@@ -291,15 +292,24 @@ def reasoning_pass(
     context: str,
 ) -> str:
     """
-    STEP 2: Free-text clinical reasoning pass.
+    STEP 2: Free-form reasoning phase.
 
-    Gemma 4 deliberates on the case with no format constraints.
-    The reasoning is then passed back as an assistant turn in Step 3,
-    forcing the structured output to be consistent with the reasoning.
-    This is the key architectural improvement over single-pass generation.
+    This is intentionally unrestricted.
+
+    The model:
+        - deliberates clinically
+        - weighs diagnoses
+        - reasons about urgency
+        - plans investigations
+        - proposes treatment
+
+    The reasoning output is later injected back into Step 3.
+    This creates consistency between reasoning and final JSON.
     """
+
     logger.info("[STEP 2] Starting reasoning pass")
 
+    # Populate reasoning prompt template
     prompt = REASONING_PROMPT.format(
         age_group=age_group,
         symptoms=symptoms,
@@ -308,6 +318,7 @@ def reasoning_pass(
         context=context,
     )
 
+    # Call Ollama for unrestricted reasoning
     response = ollama.chat(
         model=OLLAMA_MODEL,
         messages=[

@@ -1,42 +1,110 @@
 """
 knowledge_base.py — PDF ingestion, chunking, and indexing pipeline
 
-Usage:
-    python knowledge_base.py                          # index all PDFs in ./knowledge_base_docs/
-    python knowledge_base.py --file path/to/doc.pdf  # index a single file
-    python knowledge_base.py --stats                 # print DB stats
-    python knowledge_base.py --reset                 # wipe and re-index
+This module builds the ClinAssist Uganda retrieval knowledge base.
+
+MAIN RESPONSIBILITIES
+───────────────────────────────────────────────────────────────────────────────
+
+1. Extract text from clinical guideline PDFs
+2. Clean noisy PDF formatting artefacts
+3. Split text into overlapping semantic chunks
+4. Detect chapter/topic metadata
+5. Generate stable chunk identifiers
+6. Store chunks in ChromaDB for retrieval (RAG)
+
+USAGE
+───────────────────────────────────────────────────────────────────────────────
+
+Index all PDFs in ./knowledge_base_docs/:
+
+    python knowledge_base.py
+
+Index a single PDF:
+
+    python knowledge_base.py --file path/to/document.pdf
+
+Print ChromaDB statistics:
+
+    python knowledge_base.py --stats
+
+Wipe and rebuild database:
+
+    python knowledge_base.py --reset
 """
 
-import argparse
-import hashlib
-import logging
-import re
-import sys
-from pathlib import Path
+# =============================================================================
+# IMPORTS
+# =============================================================================
 
+import argparse         # Command-line argument parsing
+import hashlib          # Stable chunk ID generation
+import logging          # Logging and diagnostics
+import re               # Regex-based cleaning/detection
+import sys              # System exit handling
+from pathlib import Path   # File path management
+
+
+# =============================================================================
+# LOGGER CONFIGURATION
+# =============================================================================
 logger = logging.getLogger(__name__)
+
+# Configure console logging format
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)s  %(message)s")
 
+
+# =============================================================================
+# GLOBAL CONFIGURATION
+# =============================================================================
+
+# Directory containing clinical guideline PDFs
 DOCS_DIR    = Path("./knowledge_base_docs")
-CHUNK_SIZE  = 200    # target tokens per chunk (words as proxy)
-CHUNK_OVER  = 40     # overlap words between chunks
+
+# Approximate target chunk size
+# (words are used as a lightweight token approximation)
+CHUNK_SIZE  = 200    
+
+# Overlap between chunks to preserve context continuity
+CHUNK_OVER  = 40     
 
 
 # ── PDF extraction ─────────────────────────────────────────────────────────────
-
 def extract_text_from_pdf(pdf_path: Path) -> list[dict]:
     """
-    Extract text page-by-page from a PDF.
-    Returns list of { page_number, text }.
-    Falls back to pdfminer if PyMuPDF is unavailable.
+    Extract text from a PDF page-by-page.
+
+    Returns:
+        List of dictionaries:
+        [
+            {
+                "page_number": int,
+                "text": str
+            }
+        ]
+
+    Extraction Strategy:
+        1. Try PyMuPDF first (faster and cleaner)
+        2. Fallback to pdfminer.six if unavailable
+
+    Why page-by-page extraction?
+        Preserves metadata for source referencing and citations.
     """
     try:
+        # Preferred PDF engine
         import fitz  # PyMuPDF
         doc = fitz.open(str(pdf_path))
+
+        # Open PDF
         pages = []
+
+        # Iterate through PDF pages
         for i, page in enumerate(doc):
+
+            # Extract plain text
             text = page.get_text("text").strip()
+
+            # Skip empty pages
             if text:
                 pages.append({"page_number": i + 1, "text": text})
         doc.close()
@@ -66,14 +134,31 @@ def extract_text_from_pdf(pdf_path: Path) -> list[dict]:
 
 
 # ── Text cleaning ──────────────────────────────────────────────────────────────
-
 def clean_text(text: str) -> str:
-    """Remove headers/footers noise, normalise whitespace."""
+    """
+    Clean extracted PDF text.
+
+    Removes:
+        - form-feed characters
+        - excessive whitespace
+        - broken line formatting
+        - PDF hyphenation artefacts
+
+    This improves chunk quality and embedding accuracy.
+    """
+
     # Remove common PDF artefacts
-    text = re.sub(r"\x0c", " ", text)            # form feed
-    text = re.sub(r"[ \t]+", " ", text)          # compress spaces
-    text = re.sub(r"\n{3,}", "\n\n", text)       # max two blank lines
-    text = re.sub(r"-\n", "", text)              # hyphenated line breaks
+    text = re.sub(r"\x0c", " ", text)
+
+    # Compress repeated spaces/tabs            
+    text = re.sub(r"[ \t]+", " ", text) 
+
+    # Limit consecutive blank lines         
+    text = re.sub(r"\n{3,}", "\n\n", text)   
+
+    # Fix broken hyphenated line wraps    
+    text = re.sub(r"-\n", "", text)       
+
     return text.strip()
 
 
@@ -81,17 +166,39 @@ def clean_text(text: str) -> str:
 
 def chunk_page_text(text: str, page_number: int) -> list[dict]:
     """
-    Split page text into overlapping chunks.
-    Returns list of { chunk_index, text, start_word, end_word }.
+    Split page text into overlapping semantic chunks.
+
+    Why overlap?
+        Prevents important context from being split between chunks.
+
+    Returns:
+        [
+            {
+                "chunk_index": int,
+                "text": str,
+                "start_word": int,
+                "end_word": int,
+                "page_number": int
+            }
+        ]
     """
+
+    # Basic word tokenisation
     words = text.split()
     chunks = []
     start = 0
     idx = 0
 
+    # Sliding-window chunking
     while start < len(words):
+
+        # Determine chunk end
         end = min(start + CHUNK_SIZE, len(words))
+
+        # Reconstruct chunk text
         chunk_text = " ".join(words[start:end])
+
+        # Store chunk metadata
         chunks.append({
             "chunk_index": idx,
             "text": chunk_text,
@@ -99,7 +206,10 @@ def chunk_page_text(text: str, page_number: int) -> list[dict]:
             "end_word": end,
             "page_number": page_number,
         })
+
+        # Advance window with overlap preserved
         start += CHUNK_SIZE - CHUNK_OVER
+
         idx += 1
 
     return chunks
@@ -107,12 +217,15 @@ def chunk_page_text(text: str, page_number: int) -> list[dict]:
 
 # ── Chapter detection ──────────────────────────────────────────────────────────
 
+# Generic chapter/section regex
 CHAPTER_RE = re.compile(
     r"(chapter\s+\d+|section\s+\d+[\.\d]*|part\s+[ivxIVX\d]+)",
     re.IGNORECASE,
 )
 
-# Known page ranges for UCG 2023 only
+# -------------------------------------------------------------------------
+# Fixed page ranges for Uganda Clinical Guidelines 2023
+# These provide highly reliable chapter classification
 UCG_CHAPTER_RANGES = [
     (1,   30,   "Front Matter"),
     (31,  80,   "Chapter 1: Primary Health Care"),
@@ -133,7 +246,9 @@ UCG_CHAPTER_RANGES = [
     (1101,1158, "Appendices and References"),
 ]
 
-# Keywords that identify chapter topics in any PDF
+# -------------------------------------------------------------------------
+# Topic keyword mapping
+# Used for automatic chapter inference across ANY PDF
 TOPIC_KEYWORDS = [
     (["malaria", "plasmodium", "artemether", "artesunate", "rdt"],
      "Malaria"),
@@ -177,12 +292,26 @@ def detect_chapter(
     source_file: str = "",
 ) -> str:
     """
-    Detect chapter using 3 strategies in order:
+    Detect the clinical topic/chapter of a page.
 
-    1. Page range lookup — for UCG 2023 only (100% reliable)
-    2. Topic keyword scan — works for any PDF automatically
-    3. Carry forward — if nothing found, inherit from previous page
+    Detection strategies are applied in order:
+
+    STRATEGY 1:
+        Fixed page-range lookup
+        (best for Uganda Clinical Guidelines)
+
+    STRATEGY 2:
+        Topic keyword matching
+        (works across arbitrary PDFs)
+
+    STRATEGY 3:
+        Carry previous chapter forward
+        (maintains continuity across pages)
+
+    Returns:
+        Chapter/topic name
     """
+
     # Strategy 1: UCG page range lookup
     if "ucg" in source_file.lower() or "uganda clinical" in source_file.lower():
         for start, end, chapter in UCG_CHAPTER_RANGES:
@@ -190,19 +319,28 @@ def detect_chapter(
                 return chapter
 
     # Strategy 2: Topic keyword scan (works for any PDF)
+
+    # Scan first 800 chars for efficiency
     text_lower = text[:800].lower()
     for keywords, chapter_name in TOPIC_KEYWORDS:
+
+         # Count keyword matches
         matches = sum(1 for kw in keywords if kw in text_lower)
-        if matches >= 2:  # require at least 2 keyword matches for confidence
+
+        # Require multiple matches for confidence
+        if matches >= 2:  
             return chapter_name
 
-    # Strategy 3: Carry forward
+    # # Strategy 3: Carry previous chapter forward
     return prev_chapter
  
 
 
-# ── Metadata extraction ────────────────────────────────────────────────────────
+# =============================================================================
+# DOCUMENT METADATA INFERENCE
+# =============================================================================
 
+# Human-readable document name mapping
 DOCUMENT_NAMES = {
     "uganda clinical guidelines": "Uganda Clinical Guidelines 2023",
     "ucg":                        "Uganda Clinical Guidelines 2023",
@@ -220,12 +358,26 @@ def infer_document_name(filename: str) -> str:
     return Path(filename).stem.replace("_", " ").replace("-", " ").title()
 
 
-# ── Chunk ID ───────────────────────────────────────────────────────────────────
+# ── Chunk ID GENERATION───────────────────────────────────────────────────────────────────
 
 def make_chunk_id(source_file: str, page: int, chunk_index: int) -> str:
-    """Stable, collision-resistant chunk identifier."""
+    """
+    Generate a stable, collision-resistant chunk ID.
+
+    Why stable IDs matter:
+        - prevents duplicate indexing
+        - supports updates/re-indexing
+        - enables deterministic retrieval
+
+    Example:
+        ucg_p0023_c004_a1b2c3d4
+    """
     raw = f"{source_file}::p{page}::c{chunk_index}"
+
+    # Hash for uniqueness
     h = hashlib.md5(raw.encode()).hexdigest()[:8]
+
+    # Safe filename stem
     safe_stem = re.sub(r"[^a-zA-Z0-9]", "_", Path(source_file).stem)[:20]
     return f"{safe_stem}_p{page:04d}_c{chunk_index:03d}_{h}"
 
@@ -234,29 +386,57 @@ def make_chunk_id(source_file: str, page: int, chunk_index: int) -> str:
 
 def ingest_pdf(pdf_path: Path, dry_run: bool = False) -> int:
     """
-    Full pipeline: extract → clean → chunk → embed → store.
-    Returns number of chunks added to the DB.
+    Full ingestion pipeline.
+
+    PIPELINE:
+        extract
+            → clean
+            → detect chapter
+            → chunk
+            → generate metadata
+            → store in ChromaDB
+
+    Returns:
+        Number of chunks successfully added
     """
-    from database import add_chunks  # local import to avoid circular deps
+
+    # local import to avoid circular deps
+    from database import add_chunks  
 
     logger.info(f"Processing: {pdf_path.name}")
+
+    # Extract PDF text
     pages = extract_text_from_pdf(pdf_path)
     if not pages:
         logger.warning(f"No text extracted from {pdf_path.name}")
         return 0
 
+    # Infer readable document name
     doc_name = infer_document_name(pdf_path.name)
     all_chunks = []
 
     prev_chapter = "General"
+
+    # Process each page
     for page_data in pages:
+
+        # Clean raw PDF text
         cleaned = clean_text(page_data["text"])
+
+        # Skip low-content pages
         if len(cleaned) < 80:
             continue
+
+         # Detect chapter/topic
         chapter      = detect_chapter(cleaned, prev_chapter, page_number=page_data["page_number"], source_file=pdf_path.name)
+
+        # Preserve chapter continuity
         prev_chapter = chapter  # carry forward to next page
 
+        # Split into semantic chunks
         page_chunks = chunk_page_text(cleaned, page_data["page_number"])
+
+        # Build chunk records
         for chunk in page_chunks:
             chunk_id = make_chunk_id(pdf_path.name, chunk["page_number"], chunk["chunk_index"])
             all_chunks.append({
@@ -273,10 +453,12 @@ def ingest_pdf(pdf_path: Path, dry_run: bool = False) -> int:
 
     logger.info(f"  → {len(pages)} pages → {len(all_chunks)} chunks ready")
 
+    # Dry-run mode skips DB insertion
     if dry_run:
         logger.info(f"  → DRY RUN: skipping DB write")
         return 0
 
+    # Store chunks in vector DB
     added = add_chunks(all_chunks)
     logger.info(f"  → {added} new chunks written to ChromaDB")
     return added
