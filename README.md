@@ -24,7 +24,7 @@ I built ClinAssist to close that gap. Not with a chatbot. With a grounded, offli
 
 ## Demo
 
-> *Add your YouTube demo link here*
+> *[Add your YouTube demo link here](https://youtu.be/HZ8xT862mMI?si=CUhMQjmssHVkiEfE)*
 
 ---
 
