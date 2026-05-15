@@ -1,3 +1,44 @@
+"""Two models, one relationship:
+ 
+    Visit      — records a single patient encounter (symptoms, setting, duration)
+    Diagnosis  — stores the AI-generated assessment for that visit
+ 
+Design decisions worth noting:
+ 
+    Separate JSONFields instead of one blob
+        diagnoses_json, tests_json, treatments_json, red_flags_json, and
+        sources_json are stored as individual JSONField columns rather than
+        a single large JSON blob. This allows the reports module to query
+        specific fields independently — e.g. filtering all URGENT triage
+        visits, or counting visits where a specific diagnosis appeared —
+        without parsing a monolithic object in application code.
+ 
+    Doctor annotation layer (doctor_notes + final_diagnosis)
+        The AI output is never treated as ground truth. Two fields allow
+        the clinical officer to annotate every result:
+            final_diagnosis  — the confirmed diagnosis after examination
+                               and investigation results
+            doctor_notes     — free-text clinical notes and follow-up plan
+ 
+        final_diagnosis is the most important field in the system.
+        When a patient returns, diagnoses/views.py injects their history
+        into the next AI analysis — and it always prefers final_diagnosis
+        over the AI suggestion. A doctor confirming "Malaria (RDT positive)"
+        means the next analysis receives ground truth, not a probability.
+        This is the feedback loop that improves accuracy over time.
+ 
+    LLM metadata fields (llm_model, latency_s, chunks_used)
+        These are stored for auditability and performance monitoring.
+        A clinician reviewing a past diagnosis can see exactly which model
+        version produced it, how long it took, and how many guideline
+        chunks were used — making every output fully traceable.
+ 
+    Doctor FK with SET_NULL on Visit
+        If a clinical officer account is deleted, their visits are not
+        deleted with them. The patient record and clinical history are
+        preserved. An admin can query orphaned visits via the Django admin.
+"""
+
 from django.db import models
 from django.conf import settings
 from patients.models import Patient

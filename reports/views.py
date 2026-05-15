@@ -1,3 +1,40 @@
+"""
+Two views:
+ 
+    report_index   — renders an HTML summary table for a date range
+    download_pdf   — generates and streams a downloadable PDF report
+ 
+Design decisions worth noting:
+ 
+    Reports are generated on the fly, not cached or pre-built.
+        Health centre deployments have low report frequency (a doctor
+        might download one report per week). On-demand generation keeps
+        the system simple — no scheduled tasks, no stored report files,
+        no disk management. ReportLab renders directly to a BytesIO
+        buffer and streams the response in under a second for typical
+        date ranges.
+ 
+    Role-based data access is enforced at the query level.
+        _visits_for_user() applies the same access control used
+        throughout the system: clinical officers see only their own
+        visits; admins see all visits at the facility. This means
+        a doctor downloading a PDF report can never inadvertently
+        include another doctor's patients — the filter happens before
+        any data reaches ReportLab.
+ 
+    final_diagnosis is preferred over AI suggestion in the report.
+        For each visit, the report displays the doctor's confirmed
+        diagnosis (final_diagnosis) if available, falling back to
+        the AI's top suggestion otherwise. This ensures the report
+        reflects clinical ground truth, not AI probability — which
+        matters when reports are submitted to district health offices
+        or used for MOH statistics.
+ 
+    ReportLab is imported inside download_pdf, not at module level.
+        This means the rest of the application loads normally even if
+        reportlab is not installed. The ImportError is caught cleanly
+        with an actionable error message rather than crashing on startup.
+"""
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.http import HttpResponse
@@ -9,6 +46,15 @@ from patients.models  import Patient
 
 
 def _visits_for_user(user, date_from, date_to):
+    """
+    Return visits for the given date range, filtered by user role.
+ 
+    Clinical officers receive only their own visits.
+    Admins and superusers receive all visits in the facility.
+ 
+    Uses select_related and prefetch_related to avoid N+1 queries
+    when the caller iterates over visits and their diagnoses.
+    """
     qs = Visit.objects.select_related("patient", "doctor") \
                       .prefetch_related("diagnoses") \
                       .filter(created_at__date__gte=date_from,
@@ -20,6 +66,18 @@ def _visits_for_user(user, date_from, date_to):
 
 @login_required
 def report_index(request):
+    """
+    Render the HTML report dashboard for a given date range.
+ 
+    Date range defaults to the last 30 days if not provided in
+    query parameters. Invalid date strings fall back to the default
+    silently — no error is surfaced to the user.
+ 
+    Summary stats (total visits, unique patients, urgent cases) are
+    computed here and passed to the template. urgent_count iterates
+    over the queryset rather than using a database aggregation because
+    the visits are already loaded for the table render — no extra query.
+    """
     today     = timezone.now().date()
     date_from = request.GET.get("from", str(today - timedelta(days=30)))
     date_to   = request.GET.get("to",   str(today))
@@ -52,7 +110,22 @@ def report_index(request):
 
 @login_required
 def download_pdf(request):
-    """Generate and download a PDF report."""
+    """
+    Generate and stream a PDF clinical report for a given date range.
+ 
+    The PDF is built using ReportLab's Platypus layout engine:
+        - Header: facility name, doctor name, date range, generation timestamp
+        - Summary table: total visits, unique patients, urgent case count
+        - Visit table: one row per visit with patient ID, symptoms summary,
+          triage level, and confirmed or AI diagnosis
+ 
+    The report filename encodes the date range:
+        ClinAssist_Report_2026-04-01_2026-05-01.pdf
+ 
+    Streams directly to the browser as an attachment — no file is
+    written to disk. BytesIO buffer is used and discarded after the
+    HTTP response is sent.
+    """
     today     = timezone.now().date()
     date_from = request.GET.get("from", str(today - timedelta(days=30)))
     date_to   = request.GET.get("to",   str(today))
