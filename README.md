@@ -413,7 +413,7 @@ The next phase uses Gemma 4's multimodal architecture. A clinical officer photog
 
 ## License
 
-MIT License
+MIT License — see [LICENSE](LICENSE)
 
 ---
 
