@@ -371,7 +371,7 @@ Each clinical officer registers with a username, email, role (Doctor / Nurse / A
 
 **Adding more PDFs:** Drop any PDF into `knowledge_base_docs/` and run `python .\ai\knowledge_base.py`. For non-UCG PDFs, chapter detection falls back to topic keyword scanning — no code changes needed.
 
-All source PDFs freely available at: https://www.health.go.ug/publications
+All source PDFs freely available at: https://library.health.go.ug/uganda-clinical-guidelines-2023
 
 ---
 
