@@ -10,7 +10,7 @@
 
 ## The Problem Is Not Knowledge. It's Access.
 
-Uganda has **1 doctor for every 25,000 people**.
+Uganda has **1 doctor for every 25,000 people**. [Read more here:] (https://pmc.ncbi.nlm.nih.gov/articles/PMC7533609/)
 
 At a Health Centre III in rural Karamoja or Kasese, a single clinical officer sees 80+ patients a day. No specialist to call. No reliable internet. No time. One wrong decision may lead to a missed malaria diagnosis in a 2-year-old, a paediatric dose given to an adult can cost a life.
 
