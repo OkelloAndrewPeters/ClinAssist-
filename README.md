@@ -268,7 +268,7 @@ ClinIQ_Django/core/
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/YOUR_USERNAME/clinassist-uganda.git
+git clone https://github.com/OkelloAndrewPeters/ClinAssist-
 cd clinassist-uganda/core
 ```
 
