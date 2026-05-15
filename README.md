@@ -14,7 +14,7 @@ Uganda has **1 doctor for every 25,000 people**. [Read more here:](https://pmc.n
 
 At a Health Centre III in rural Karamoja or Kasese, a single clinical officer sees 80+ patients a day. No specialist to call. No reliable internet. No time. One wrong decision may lead to a missed malaria diagnosis in a 2-year-old, a paediatric dose given to an adult can cost a life.
 
-The Uganda Ministry of Health publishes comprehensive clinical guidelines. 1,158 pages of evidence-based protocols covering every condition from malaria to meningitis, maternal emergencies to childhood fever (https://library.health.go.ug/uganda-clinical-guidelines-2023). The knowledge exists. It is peer-reviewed, government-endorsed, and freely available.
+The Uganda Ministry of Health publishes comprehensive clinical guidelines. [1,158 pages of evidence-based protocols](https://library.health.go.ug/uganda-clinical-guidelines-2023) covering every condition from malaria to meningitis, maternal emergencies to childhood fever. The knowledge exists. It is peer-reviewed, government-endorsed, and freely available.
 
 **It just never reaches the clinical officer at the moment they need it.**
 
